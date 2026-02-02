@@ -57,7 +57,7 @@ describe("Tokens", () => {
               Editor.Range.toString(range) ++ " " ++ Token.toStringWithoutOffsets(token)
             },
           )
-        let srcOfPrimitive = switch ctx.state.agdaVersion {
+        let srcOfPrimitive = switch Connection__Manager.getAgdaVersion() {
         | Some(version) =>
           if Util.Version.gte(version, "2.6.4") {
             "[src: 388]"

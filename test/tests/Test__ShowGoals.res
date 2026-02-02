@@ -18,7 +18,7 @@ let run = normalization => {
 
     let filepath = Path.asset(filename)
     
-    switch ctx.state.agdaVersion {
+    switch Connection__Manager.getAgdaVersion() {
     | Some(version) =>
       let expectedAllGoalsWarningsBody = if Util.Version.gte(version, "2.8.0") {
         // Agda 2.8.0+ uses dot format for positions and includes error codes

@@ -24,7 +24,7 @@ describe("agda-mode.why-in-scope", () => {
     let filteredResponses = responses->Array.filter(filteredResponse)
     let dependencyFilepath = Path.asset("Lib.agda")
     
-    switch ctx.state.agdaVersion {
+    switch Connection__Manager.getAgdaVersion() {
     | Some(version) =>
       let positionFormat = if Util.Version.gte(version, "2.8.0") {
         // Agda 2.8.0+ uses dot format for WhyInScope
@@ -59,7 +59,7 @@ describe("agda-mode.why-in-scope", () => {
     let filteredResponses = responses->Array.filter(filteredResponse)
     let dependencyFilepath = Path.asset("Lib.agda")
     
-    switch ctx.state.agdaVersion {
+    switch Connection__Manager.getAgdaVersion() {
     | Some(version) =>
       let positionFormat = if Util.Version.gte(version, "2.8.0") {
         // Agda 2.8.0+ uses dot format for WhyInScope

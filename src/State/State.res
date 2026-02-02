@@ -49,9 +49,6 @@ type channels = {
 type t = {
   // platform dependencies for dependency injection
   platformDeps: Platform.t,
-  // connection
-  mutable connection: option<Connection.t>,
-  mutable agdaVersion: option<string>, // Agda version is set when connection is established
   // editor and document
   mutable editor: VSCode.TextEditor.t,
   mutable document: VSCode.TextDocument.t,
@@ -87,8 +84,6 @@ let make = (
   semanticTokens: option<Resource.t<array<Highlighting__SemanticToken.t>>>,
 ) => {
   platformDeps,
-  connection: None,
-  agdaVersion: None,
   editor,
   document: VSCode.TextEditor.document(editor),
   panelCache: ViewCache.make(),
@@ -127,9 +122,7 @@ let destroy = async (state, alsoRemoveFromRegistry) => {
   state.tokens->Tokens.reset
   state.tokens->Tokens.destroyUpdateChannel
   state.channels.log->Chan.emit(Others("State.destroy: Tokens reset completed"))
-  let result = await Connection.destroy(state.connection, state.channels.log)
-  state.channels.log->Chan.emit(Others("State.destroy: Connection destroyed, destruction complete"))
-  result
+  Ok()
 }
 
 // control the scope of command key-binding

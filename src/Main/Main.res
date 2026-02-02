@@ -255,7 +255,7 @@ let registerInputMethodHintHoverProvider = () => {
 }
 
 // TODO: rename `finalize`
-let finalize = isRestart => {
+let finalize = async (isRestart, channels: State.channels) => {
   // after the last Agda file has been closed
   if Registry.isEmpty() {
     // destroy views accordingly
@@ -265,6 +265,7 @@ let finalize = isRestart => {
     if !isRestart {
       Singleton.DebugBuffer.destroy()
     }
+    await Connection__Manager.disconnect(channels.log)
   }
 }
 
@@ -345,8 +346,9 @@ let activateWithoutContext = (
   // on close editor
   Inputs.onCloseDocument(document => {
     if isAgda(document) {
-      Registry.removeAndDestroy(document)->ignore
-      finalize(false)->ignore
+      Registry.removeAndDestroy(document)
+      ->Promise.then(() => finalize(false, channels))
+      ->Promise.done
     }
   })->subscribe
   // on triggering commands
@@ -356,10 +358,11 @@ let activateWithoutContext = (
     switch command {
     | Quit =>
       await Registry.removeAndDestroy(document)
-      finalize(false)
+      await finalize(false, channels)
     | Restart =>
+      await Connection__Manager.disconnect(channels.log)
       await Registry.removeAndDestroy(document)
-      finalize(true)
+      await finalize(true, channels)
     | _ => ()
     }
     // make
