@@ -2,18 +2,24 @@ module Error = Connection__Error
 
 type t = {
   mutable connection: option<Connection.t>,
+  mutable connecting: option<promise<result<Connection.t, Error.t>>>,
   mutable pendingRequest: option<promise<result<unit, Error.t>>>,
+  mutable spawnCount: int,
 }
 
-// Singleton instance to ensure only one Agda process runs at a time
+// Singleton instance to ensure only one Agda process runs at a time.
 let instance = {
   connection: None,
+  connecting: None,
   pendingRequest: None,
+  spawnCount: 0,
 }
 
-// Disconnects and destroys the current connection
+// Disconnects and destroys the current shared connection.
+// Called during "Restart" or when the last Agda document is closed.
 let disconnect = async (log) => {
   instance.pendingRequest = None
+  instance.connecting = None
   switch instance.connection {
   | Some(conn) =>
     let _ = await Connection.destroy(Some(conn), log)
@@ -22,20 +28,22 @@ let disconnect = async (log) => {
   }
 }
 
-// A task queue that ensures requests are sent to Agda sequentially.
-// This prevents race conditions where multiple tabs might try to talk to the same process simultaneously.
+// A task queue that ensures requests are sent to the shared Agda process sequentially.
+// This prevents race conditions and interleaved responses when multiple tabs 
+// trigger Agda commands simultaneously.
 let schedule = (task: unit => promise<result<unit, Error.t>>): promise<result<unit, Error.t>> => {
   let prev = switch instance.pendingRequest {
   | Some(p) => p
   | None => Promise.resolve(Ok())
   }
   
-  // Chain the new task after the previous one completes (regardless of success/failure)
+  // Chain the new task after the previous one completes (regardless of its success/failure).
+  // This ensures the queue never stalls even if one request fails.
   let next = async () => {
     try {
       let _ = await prev
     } catch {
-    | _ => () // ignore previous errors so the queue doesn't stall
+    | _ => () // ignore previous result
     }
     await task()
   }
@@ -45,30 +53,39 @@ let schedule = (task: unit => promise<result<unit, Error.t>>): promise<result<un
   promise
 }
 
-// Gets the existing connection or creates a new one if none exists.
-// Shared by all State instances.
+// Gets the existing shared connection or creates a new one if none exists.
+// Handles concurrent calls by caching the "connecting" promise to prevent race conditions.
 let acquire = async (state: State.t) => {
   switch instance.connection {
   | Some(conn) => Ok(conn)
   | None =>
-    let result = await Connection.makeWithFallback(
-      state.platformDeps,
-      state.memento,
-      state.globalStorageUri,
-      Config.Connection.getAgdaPaths(),
-      ["als", "agda"],
-      state.channels.log,
-    )
-    switch result {
-    | Ok(conn) =>
-      instance.connection = Some(conn)
-      Ok(conn)
-    | Error(e) => Error(e)
+    switch instance.connecting {
+    | Some(promise) => await promise
+    | None =>
+      let promise = Connection.makeWithFallback(
+        state.platformDeps,
+        state.memento,
+        state.globalStorageUri,
+        Config.Connection.getAgdaPaths(),
+        ["als", "agda"],
+        state.channels.log,
+      )
+      instance.connecting = Some(promise)
+      let result = await promise
+      instance.connecting = None
+      
+      switch result {
+      | Ok(conn) =>
+        instance.spawnCount = instance.spawnCount + 1
+        instance.connection = Some(conn)
+        Ok(conn)
+      | Error(e) => Error(e)
+      }
     }
   }
 }
 
-// Helper to get version from the active connection
+// Helper to retrieve the Agda version string from the currently active shared connection.
 let getAgdaVersion = () =>
   switch instance.connection {
   | Some(Agda(_, _, version)) => Some(version)
@@ -76,7 +93,8 @@ let getAgdaVersion = () =>
   | _ => None
   }
 
-// Global switch version: tears down the old process and starts a new one
+// Forces a connection switch (used by the Switch Version UI).
+// Tears down the existing process and establishes a new one.
 let switchConnection = async (state: State.t, path: string) => {
   // destroy old
   await disconnect(state.channels.log)
@@ -84,10 +102,15 @@ let switchConnection = async (state: State.t, path: string) => {
   // create new
   switch await Connection.make(path) {
   | Ok(conn) =>
+    instance.spawnCount = instance.spawnCount + 1
     instance.connection = Some(conn)
     Ok(conn)
-  | Error(e) => Error(e)
+  | Error(e) => Error(Error.Establish(e))
   }
 }
 
 let getConnection = () => instance.connection
+
+// For testing only
+let getSpawnCount = () => instance.spawnCount
+let resetSpawnCount = () => instance.spawnCount = 0

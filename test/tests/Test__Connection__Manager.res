@@ -47,6 +47,30 @@ describe("Connection Manager Integration", () => {
 
   Async.beforeEach(async () => {
     await Connection__Manager.disconnect(Chan.make())
+    Connection__Manager.resetSpawnCount()
+  })
+
+  Async.it("should handle concurrent acquire calls correctly", async () => {
+    let state1 = makeMockState()
+    let state2 = makeMockState()
+    
+    // Acquire connection for both states concurrently
+    let promises = [
+      Connection__Manager.acquire(state1),
+      Connection__Manager.acquire(state2)
+    ]
+    
+    let results = await Promise.all(promises)
+    
+    // Both should succeed
+    let conn1 = switch results[0] { | Some(Ok(c)) => c | _ => failwith("First acquire failed") }
+    let conn2 = switch results[1] { | Some(Ok(c)) => c | _ => failwith("Second acquire failed") }
+    
+    // Should be same instance
+    Assert.equal(conn1, conn2)
+    
+    // Should have spawned only once
+    Assert.equal(Connection__Manager.getSpawnCount(), 1)
   })
 
   Async.after(async () => {
@@ -120,7 +144,7 @@ describe("Connection Manager Integration", () => {
     
     let newConn = switch switchResult {
     | Ok(c) => c
-    | Error(e) => failwith("Failed to switch: " ++ Connection.Error.toString(Establish(e))->fst)
+    | Error(e) => failwith("Failed to switch: " ++ Connection.Error.toString(e)->fst)
     }
 
     // 3. Verify the new connection is active in the manager

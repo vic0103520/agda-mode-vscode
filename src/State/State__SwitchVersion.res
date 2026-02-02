@@ -501,7 +501,7 @@ let switchAgdaVersion = async (state: State.t, uri) => {
     | ALS(_, _, None) => () // version still unknown, don't update memento
     }
   | Error(error) => {
-      let (errorHeader, errorBody) = Connection.Error.toString(Establish(error))
+      let (errorHeader, errorBody) = Connection.Error.toString(error)
       let header = AgdaModeVscode.View.Header.Error(
         "Failed to switch to a different installation: " ++ errorHeader,
       )
