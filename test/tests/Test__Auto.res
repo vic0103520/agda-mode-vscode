@@ -15,7 +15,7 @@ let run = normalization => {
 
     let filteredResponses = responses->Array.filter(filteredResponse)
 
-    switch ctx.state.agdaVersion {
+    switch Connection__Manager.getAgdaVersion() {
     | Some(version) =>
       if Util.Version.gte(version, "2.7.0") {
         Assert.deepStrictEqual(
@@ -49,7 +49,7 @@ let run = normalization => {
 
     let filteredResponses = responses->Array.filter(filteredResponse)
 
-    switch ctx.state.agdaVersion {
+    switch Connection__Manager.getAgdaVersion() {
     | Some(version) =>
       if Util.Version.gte(version, "2.7.0") {
         Assert.deepStrictEqual(

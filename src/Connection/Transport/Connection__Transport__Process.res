@@ -63,6 +63,8 @@ module Module: Module = {
     // spawn the child process
     let process = NodeJs.ChildProcess.spawnWith("\"" ++ path ++ "\"", args, %raw(`{shell : true}`))
 
+    let self = {chan, status: Created(process)}
+
     // on `data` from `stdout`
     process
     ->NodeJs.ChildProcess.stdout
@@ -116,12 +118,17 @@ module Module: Module = {
     )
     ->ignore
 
-    // emit `OnExit` when either `close` or `exit` was received
+    // emit `OnExit` when either `close` or `exit` was received.
+    // Update the status to `Destroyed` immediately so that subsequent 
+    // calls to `destroy` return early instead of hanging.
     Promise.race([promiseOnExit, promiseOnClose])
-    ->Promise.thenResolve(exitCode => chan->Chan.emit(Event(OnExit(exitCode))))
+    ->Promise.thenResolve(exitCode => {
+      self.status = Destroyed
+      chan->Chan.emit(Event(OnExit(exitCode)))
+    })
     ->ignore
 
-    {chan, status: Created(process)}
+    self
   }
 
   let destroy = self =>

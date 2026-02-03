@@ -23,33 +23,21 @@ let sendRequest = async (
     | Ok() =>
       // display the connection state
       await State__View.Panel.displayConnectionStatus(state, Some(connection))
-      // update versions
-      switch connection {
-      | Agda(_, _, version) => state.agdaVersion = Some(version)
-      | ALS(_, _, Some(_alsVersion, agdaVersion, _)) => state.agdaVersion = Some(agdaVersion)
-      | ALS(_, _, None) => state.agdaVersion = None
-      }
     }
   }
 
-  switch state.connection {
-  | None =>
-    switch await Connection.makeWithFallback(
-      state.platformDeps,
-      state.memento,
-      state.globalStorageUri,
-      Config.Connection.getAgdaPaths(),
-      ["als", "agda"],
-      state.channels.log,
-    ) {
-    | Error(error) => await State__View.Panel.displayConnectionError(state, error)
+  // Schedule the request on the global queue to ensure that requests from
+  // different tabs are sent to the shared Agda process sequentially.
+  let _ = await Connection__Manager.schedule(async () => {
+    switch await Connection__Manager.acquire(state) {
+    | Error(error) => 
+      await State__View.Panel.displayConnectionError(state, error)
+      Error(error)
     | Ok(connection) =>
-      state.connection = Some(connection)
       await sendRequestAndHandleResponses(connection, state, request, handleResponse)
+      Ok()
     }
-  | Some(connection) =>
-    await sendRequestAndHandleResponses(connection, state, request, handleResponse)
-  }
+  })
 }
 
 // like `sendRequest` but collects all responses, for testing

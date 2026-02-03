@@ -302,7 +302,6 @@ module SwitchVersionManager = {
   // Get current items as data
   let getItemData = async (
     self: t,
-    state: State.t,
     downloadItems: array<(bool, string, string)>,
   ): array<ItemData.t> => {
     // Always check current connection to ensure UI reflects actual state
@@ -318,7 +317,7 @@ module SwitchVersionManager = {
       }
     | None =>
       // Fresh install: try to infer active connection from current state
-      switch state.connection {
+      switch Connection__Manager.getConnection() {
       | Some(connection) =>
         // Extract path from connection
         let connectionPath = switch connection {
@@ -476,13 +475,9 @@ let switchAgdaVersion = async (state: State.t, uri) => {
     [],
   )
 
-  switch await Connection.make(path) {
+  switch await Connection__Manager.switchConnection(state, path) {
   | Ok(conn) =>
-    // stop the old connection
-    let _ = await Connection.destroy(state.connection, state.channels.log)
-
     // update state
-    state.connection = Some(conn)
     await Memento.PickedConnection.set(state.memento, Some(path))
     await Config.Connection.addAgdaPath(state.channels.log, path)
 
@@ -506,7 +501,7 @@ let switchAgdaVersion = async (state: State.t, uri) => {
     | ALS(_, _, None) => () // version still unknown, don't update memento
     }
   | Error(error) => {
-      let (errorHeader, errorBody) = Connection.Error.toString(Establish(error))
+      let (errorHeader, errorBody) = Connection.Error.toString(error)
       let header = AgdaModeVscode.View.Header.Error(
         "Failed to switch to a different installation: " ++ errorHeader,
       )
@@ -949,7 +944,7 @@ module Handler = {
 
     // Helper function to update UI with current state
     let updateUI = async (downloadItems: array<(bool, string, string)>): unit => {
-      let itemData = await SwitchVersionManager.getItemData(manager, state, downloadItems)
+      let itemData = await SwitchVersionManager.getItemData(manager, downloadItems)
 
       // Log selection marking for testing observability
       let endpointItemDatas = itemData->Array.filterMap(item =>
