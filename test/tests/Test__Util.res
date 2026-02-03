@@ -403,6 +403,9 @@ module AgdaMode = {
 
     //
     let load = async (channels: State.channels, filepath) => {
+      // Ensure we start with a fresh connection for this test
+      await Connection__Manager.disconnect(channels.log)
+
       let (promise, resolve, _) = Util.Promise_.pending()
 
       let disposable = channels.commandHandled->Chan.on(command => {

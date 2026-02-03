@@ -18,12 +18,18 @@ let instance = {
 // Disconnects and destroys the current shared connection.
 // Called during "Restart" or when the last Agda document is closed.
 let disconnect = async (log) => {
+  // Reset the queue so subsequent requests don't wait on old promises
   instance.pendingRequest = None
   instance.connecting = None
   switch instance.connection {
   | Some(conn) =>
-    let _ = await Connection.destroy(Some(conn), log)
     instance.connection = None
+    try {
+      let _ = await Connection.destroy(Some(conn), log)
+    } catch {
+    | _ => () // Ignore errors during destruction (e.g. if already destroyed)
+    }
+    ()
   | None => ()
   }
 }
