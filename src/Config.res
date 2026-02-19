@@ -66,17 +66,18 @@ module Connection = {
 
   // expects an array of JSON strings
   let parseAgdaPaths = (raw: JSON.t) => {
-    let rawPaths: array<string> = switch raw {
+    switch raw {
     | Array(strings) =>
-      strings->Array.filterMap(s =>
+      strings
+      ->Array.filterMap(s =>
         switch s {
         | String(s) => Some(s)
         | _ => None
         }
       )
+      ->Array.toReversed
     | _ => []
     }
-    rawPaths->Array.toReversed
   }
 
   let getAgdaPaths = () =>
@@ -107,7 +108,11 @@ module Connection = {
         Workspace.getConfiguration(
           Some("agdaMode"),
           None,
-        )->WorkspaceConfiguration.updateGlobalSettings("connection.paths", newPaths, None)
+        )->WorkspaceConfiguration.updateGlobalSettings(
+          "connection.paths",
+          newPaths->Array.toReversed,
+          None,
+        )
       }
     }
   }
@@ -124,7 +129,7 @@ module Connection = {
       Workspace.getConfiguration(
         Some("agdaMode"),
         None,
-      )->WorkspaceConfiguration.updateGlobalSettings("connection.paths", paths, None)
+      )->WorkspaceConfiguration.updateGlobalSettings("connection.paths", paths->Array.toReversed, None)
     }
   }
 
